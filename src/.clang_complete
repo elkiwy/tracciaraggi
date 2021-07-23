@@ -1,0 +1,5 @@
+-DDEBUG
+-I/Library/Developer/CommandLineTools/usr/include/c++/v1/
+-I/Library/Developer/CommandLineTools/usr/include/
+-I/usr/local/opt/boost/include/
+-I/Users/stefanobertoli/Documents/prapozio/
