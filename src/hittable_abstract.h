@@ -29,6 +29,8 @@ struct hit_record{
 
 
 
+
+
 /*
 ** Hittable abstract class
  */
@@ -36,7 +38,10 @@ struct hit_record{
 class hittable{
   public:
     virtual bool hit(const ray& r, double t_min, double t_max, hit_record& rec) const = 0;
+    virtual bool bounding_box(aabb& output_box) const = 0;
 };
+
+
 
 
 
@@ -56,11 +61,14 @@ class hittable_list : public hittable{
 
     //Hittable methods
     virtual bool hit(const ray& r, double t_min, double t_max, hit_record& rec) const override;
+    virtual bool bounding_box(aabb& output_box) const override;
 
   public:
     vector<shared_ptr<hittable>> objects;
 };
 
+
+///Hit check for hittable lists
 bool hittable_list::hit(const ray& r, double t_min, double t_max, hit_record& rec) const {
     hit_record temp_rec;
     bool hit_anything = false;
@@ -77,6 +85,113 @@ bool hittable_list::hit(const ray& r, double t_min, double t_max, hit_record& re
     return hit_anything;
 }
 
+
+///Bounding box for hittable list
+bool hittable_list::bounding_box(aabb &output_box) const{
+    if (objects.empty()) return false;
+
+    aabb temp_box;
+    bool first_box = true;
+    for(const auto& obj : objects){
+        if (!obj->bounding_box(temp_box)) return false;
+        output_box = first_box ? temp_box : box_including(output_box, temp_box);
+        first_box = false;
+    }
+
+    return true;
+}
+
+
+
+
+
+
+
+
+
+
+
+/*
+** Bounding volume hierarchy structure
+ */
+
+class bvh_node : public hittable{
+  public:
+    //Constructors
+    bvh_node();
+    bvh_node(const hittable_list& list) : bvh_node(list.objects, 0, list.objects.size()) {}
+    bvh_node(const vector<shared_ptr<hittable>>& src_objects, size_t start, size_t end);
+
+    //Hittable methods
+    virtual bool hit(const ray& r, double t_min, double t_max, hit_record& rec) const override;
+    virtual bool bounding_box(aabb& output_box) const override;
+
+  public:
+    shared_ptr<hittable> left;
+    shared_ptr<hittable> right;
+    aabb box;
+};
+
+
+///Hit check for BVH
+bool bvh_node::hit(const ray& r, double t_min, double t_max, hit_record& rec) const {
+    //Check first if the ray hit the bounding box
+    if (!box.hit(r, t_min, t_max)) return false;
+
+    //Check wether the ray hits the left node or right node
+    bool hit_left = left->hit(r, t_min, t_max, rec);
+    bool hit_right = left->hit(r, t_min, hit_left ? rec.t : t_max, rec);
+    return hit_left || hit_right;
+}
+
+
+///Bounding box for BVH
+bool bvh_node::bounding_box(aabb &output_box) const{
+    output_box = box;
+    return true;
+}
+
+///Box comparators along different axis
+inline bool box_compare(const shared_ptr<hittable> a, const shared_ptr<hittable> b, int axis) {
+    aabb box_a, box_b;
+    if (!a->bounding_box(box_a) || !b->bounding_box(box_b)) std::cerr << "No bounding box in bvh_node constructor.\n";
+    return box_a.min().e[axis] < box_b.min().e[axis];}
+bool box_x_compare (const shared_ptr<hittable> a, const shared_ptr<hittable> b) {return box_compare(a, b, 0);}
+bool box_y_compare (const shared_ptr<hittable> a, const shared_ptr<hittable> b) {return box_compare(a, b, 1);}
+bool box_z_compare (const shared_ptr<hittable> a, const shared_ptr<hittable> b) {return box_compare(a, b, 2);}
+
+///BVH Constructor
+bvh_node::bvh_node(const vector<shared_ptr<hittable>>& src_objects, size_t start, size_t end){
+    //Create a modifiable version of the src objects
+    auto objects = src_objects;
+
+    int axis = random_int(0,2);
+    auto comparator = (axis == 0) ? box_x_compare : ((axis == 1) ? box_y_compare : box_z_compare);
+    size_t object_span = end - start;
+    if (object_span == 1){
+        //Set both leaves to point to this object
+        left = right = objects[start];
+    }else if (object_span == 2){
+        //Fit the two objects into the right leaf
+        if (comparator(objects[start], objects[start+1])){left  = objects[start]; right = objects[start+1];
+        }else{left  = objects[start+1]; right = objects[start];}
+    }else{
+        //Sort the objects and recursively create other BVH nodes
+        std::sort(objects.begin()+start, objects.begin()+end, comparator);
+        auto mid = start + object_span/2;
+        left  = make_shared<bvh_node>(objects, start, mid);
+        right = make_shared<bvh_node>(objects, mid, end);
+    }
+
+    //Check that both leaves have a valid bounding box
+    aabb box_left, box_right;
+    if (!left->bounding_box(box_left) || !right->bounding_box(box_right)){
+        std::cerr << "No bounding box in bvh_node constructor";
+    }
+
+    //Create the final bounding box
+    box = box_including(box_left, box_right);
+}
 
 
 
