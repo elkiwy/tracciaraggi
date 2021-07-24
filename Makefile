@@ -28,7 +28,7 @@ $(EXECUTABLE): $(OBJECTS)
 
 #Objects
 $(OBJ)/%.o: $(SRC)/%.cpp
-	$(CC) $(FLAGS) $(INCL) -c $< -o $@
+	$(CC) $(FLAGS) $(LIBS) $(INCL) -c $< -o $@
 
 
 

@@ -62,6 +62,51 @@ color ray_color(const ray& r, const hittable& world, int depth){
     return (1.0-t)*color(1.0, 1.0, 1.0)+t*color(0.5, 0.7, 1.0);
 }
 
+hittable_list random_scene() {
+    hittable_list world;
+
+    auto ground_material = make_shared<lambertian>(color(0.5, 0.5, 0.5));
+    world.add(make_shared<sphere>(point3(0,-1000,0), 1000, ground_material));
+
+    for (int a = -11; a < 11; a++) {
+        for (int b = -11; b < 11; b++) {
+            auto choose_mat = random_double();
+            point3 center(a + 0.9*random_double(), 0.2, b + 0.9*random_double());
+
+            if ((center - point3(4, 0.2, 0)).length() > 0.9) {
+                shared_ptr<material> sphere_material;
+
+                if (choose_mat < 0.8) {
+                    // diffuse
+                    auto albedo = color::random() * color::random();
+                    sphere_material = make_shared<lambertian>(albedo);
+                    world.add(make_shared<sphere>(center, 0.2, sphere_material));
+                } else if (choose_mat < 0.95) {
+                    // metal
+                    auto albedo = color::random(0.5, 1);
+                    auto fuzz = random_double(0, 0.5);
+                    sphere_material = make_shared<metal>(albedo, fuzz);
+                    world.add(make_shared<sphere>(center, 0.2, sphere_material));
+                } else {
+                    // glass
+                    sphere_material = make_shared<dielectric>(1.5);
+                    world.add(make_shared<sphere>(center, 0.2, sphere_material));
+                }
+            }
+        }
+    }
+
+    auto material1 = make_shared<dielectric>(1.5);
+    world.add(make_shared<sphere>(point3(0, 1, 0), 1.0, material1));
+
+    auto material2 = make_shared<lambertian>(color(0.4, 0.2, 0.1));
+    world.add(make_shared<sphere>(point3(-4, 1, 0), 1.0, material2));
+
+    auto material3 = make_shared<metal>(color(0.7, 0.6, 0.5), 0.0);
+    world.add(make_shared<sphere>(point3(4, 1, 0), 1.0, material3));
+
+    return world;
+}
 
 
 
@@ -73,28 +118,23 @@ int main(int argc, char *argv[]) {
     const char* OUTPUT_PATH = "output.png";
     unsigned char pixels[IMG_WIDTH * IMG_HEIGHT * CHANNELS];
     const int SPP = 32;
-    const int MAX_DEPTH = 4;
+    const int MAX_DEPTH = 8;
 
 
     //Scene
-    hittable_list world;
-    auto material_ground = make_shared<lambertian>(color(0.8, 0.8, 0.0));
-    auto material_center = make_shared<lambertian>(color(0.7, 0.3, 0.3));
-    auto material_left   = make_shared<dielectric>(1.5);
-    auto material_right  = make_shared<metal>(color(0.8, 0.6, 0.2), 1.0);
-
-    //world.add(make_shared<sphere>(point3( 0.0, -100.5, -1.0), 100.0, material_ground));
-    //world.add(make_shared<sphere>(point3( 0.0,    0.0, -1.0),   0.5, material_center));
-
-    world.add(make_shared<sphere>(point3(0.0,    0.0, -1.0),   0.5, material_left));
-    world.add(make_shared<sphere>(point3(0.0,    0.0, -1.0),  -0.4, material_left));
-
-    //world.add(make_shared<sphere>(point3( 1.0,    0.0, -1.0),   0.5, material_right));
+    hittable_list world = random_scene();
     cout << "Scene created." << endl;
 
 
     //Camera
-    camera cam(IMG_WIDTH / IMG_HEIGHT);
+    const vec3 lookfrom = vec3(13, 2, 3);
+    const vec3 lookat   = vec3( 0, 0, 0);
+    const vec3 vup      = vec3( 0, 1, 0);
+    const double FOV = 20.0;
+    const double ASPECT_RATIO = IMG_WIDTH / IMG_HEIGHT;
+    auto dist_to_focus = 10.0;
+    auto aperture = 0.1;
+    camera cam(lookfrom, lookat, vup, FOV, ASPECT_RATIO, aperture, dist_to_focus);
     cout << "Camera created." << endl;
 
 
@@ -106,6 +146,7 @@ int main(int argc, char *argv[]) {
     int chunksDone = 0;
 
     //Render all the chunks
+    #pragma omp parallel for
     for(unsigned int k=0; k<THREADS; ++k){
         const double thread_begin = 0.0;
 
@@ -130,8 +171,8 @@ int main(int argc, char *argv[]) {
         }
 
         //Output feedback of chunk completed
-        const int thread_id = 0;
-        const double thread_end = 0.0;
+        int thread_id = omp_get_thread_num();
+        double thread_end = omp_get_wtime();
         chunksDone++;
         printf("Thread %d (chunk: %d-%d) finished in %f, remains %d chunks.\n", thread_id, k*STEP, (k+1)*STEP, (double)(thread_end - thread_begin), THREADS-chunksDone);
     }
