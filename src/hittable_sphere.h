@@ -9,13 +9,22 @@ class material;
 
 class sphere : public hittable{
   public:
+    //Constructors
     sphere() {}
     sphere(point3 cen, double r, shared_ptr<material> m) : center(cen), radius(r), mat_ptr(m) {};
 
+    //Hittable methods
     virtual bool hit(const ray& r, double t_min, double t_max, hit_record& rec) const override;
     virtual bool bounding_box(aabb& output_box) const override;
 
-  public:
+    //Utilites
+    static uv get_sphere_uv(const point3& p){
+        double theta = acos(-p.y());
+        double phi = atan2(-p.z(), p.x()) + pi;
+        return {phi / (2*pi), theta / pi};
+    }
+
+  private:
     point3 center;
     double radius;
     shared_ptr<material> mat_ptr;
@@ -41,11 +50,11 @@ bool sphere::hit(const ray& r, double t_min, double t_max, hit_record& rec) cons
     }
 
     //Write the hit record data
-    rec.t = root;
-    rec.p = r.at(rec.t);
-    vec3 outward_normal = (rec.p - center) / radius;
-    rec.set_face_normal(r, outward_normal);
-    rec.mat_ptr = mat_ptr;
+    point3 p = r.at(root);
+    point3 normal = (p-center)/radius;
+    uv coords = get_sphere_uv(normal);
+    rec.write_data(r, root, p, normal, mat_ptr, coords.u, coords.v);
+
     return true;
 }
 
@@ -57,6 +66,10 @@ bool sphere::bounding_box(aabb &output_box) const{
 
     return true;
 }
+
+
+
+
 
 
 

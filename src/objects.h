@@ -5,13 +5,24 @@
 /*
 ** Common includes
 */
+
+//Objects
 #include "hittable_abstract.h"
 #include "hittable_sphere.h"
+#include "hittable_rect.h"
 
+//Materials
 #include "material_abstract.h"
 #include "material_lambertian.h"
 #include "material_metal.h"
 #include "material_dielectric.h"
+#include "material_light.h"
 
+//Textures
+#include "texture_abstract.h"
+#include "texture_solid.h"
+#include "texture_checker.h"
+#include "texture_noise.h"
+#include "texture_image.h"
 
 #endif // __HITTABLES_H_

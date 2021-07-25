@@ -2,6 +2,7 @@
 #define __HITTABLE_ABSTRACT_H_
 
 #include <memory>
+#include <algorithm>
 #include <vector>
 
 #include "utils.h"
@@ -19,11 +20,24 @@ struct hit_record{
     vec3 normal;
     shared_ptr<material> mat_ptr;
     double t;
+    double u,v;
     bool front_face;
 
-    inline void set_face_normal(const ray& r, const vec3& outward_normal){
-        front_face = dot(r.direction(), outward_normal) < 0;
-        normal = front_face ? outward_normal : -outward_normal;
+    inline void write_data(const ray& r, double t, const point3& point, const vec3& outward_normal, shared_ptr<material> material, double u, double v){
+        //Set point and time
+        this->p = point;
+        this->t = t;
+
+        //Set face normal and face sign
+        this->front_face = dot(r.direction(), outward_normal) < 0;
+        this->normal = this->front_face ? outward_normal : -outward_normal;
+
+        //Set material
+        this->mat_ptr = material;
+
+        //Set uv
+        this->u = u;
+        this->v = v;
     }
 };
 

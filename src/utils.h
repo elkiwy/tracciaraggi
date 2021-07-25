@@ -14,6 +14,22 @@ using std::make_shared;
 
 
 
+
+/*
+** Utility structures
+*/
+struct uv{
+    double u;
+    double v;
+};
+
+enum axis{xy, xz, yz};
+
+
+
+
+
+
 /*
 ** Constants
 */
@@ -65,6 +81,7 @@ inline int random_int(int min, int max){
 #include "ray.h"
 #include "utils_vec3.h"
 #include "utils_aabb.h"
+#include "utils_perlin.h"
 
 
 #endif // __UTILS_H_

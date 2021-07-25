@@ -3,18 +3,15 @@
 #include <iostream>
 #include <math.h>
 
-//STB Library
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#include "external/stb_image_write.h"
-#include "external/stb_image.h"
+//
+#include "extern_stb_image.h"
 
 //Include OpemMP for multithreading
 #include <omp.h>
 
 //Project files
 #include "utils.h"
-#include "hittables.h"
+#include "objects.h"
 #include "camera.h"
 
 //Namespaces
@@ -42,34 +39,34 @@ void write_color(unsigned char* pixelsData, const int index, color pixel_color, 
 
 
 
-color ray_color(const ray& r, const hittable& world, int depth){
+color ray_color(const ray& r, const color& background, const hittable& world, int depth){
     //Limit max recursion
     if (depth<=0){return color(0,0,0);}
 
     //Check for world collision
     hit_record rec;
-    if(world.hit(r, 0.001, infinity, rec)){
-        ray scattered;
-        color attenuation;
-        if (rec.mat_ptr->scatter(r, rec, attenuation, scattered))
-            return attenuation * ray_color(scattered, world, depth-1);
-        return color(0,0,0);
-    }
+    if(!world.hit(r, 0.001, infinity, rec)){return background;}
 
-    //Background
-    vec3 unit_direction = unit_vector(r.direction());
-    double t = 0.5*(unit_direction.y() + 1.0);
-    return (1.0-t)*color(1.0, 1.0, 1.0)+t*color(0.5, 0.7, 1.0);
+    //Check the scattered ray
+    ray scattered;
+    color attenuation;
+    color emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
+    if (!rec.mat_ptr->scatter(r, rec, attenuation, scattered)){return emitted;}
+
+    //Recur
+    return emitted + attenuation * ray_color(scattered, background, world, depth-1);
 }
+
+
 
 hittable_list random_scene() {
     hittable_list world;
 
-    auto ground_material = make_shared<lambertian>(color(0.5, 0.5, 0.5));
-    world.add(make_shared<sphere>(point3(0,-1000,0), 1000, ground_material));
+    auto checker = make_shared<checker_texture>(color(0.2, 0.3, 0.1), color(0.9, 0.9, 0.9));
+    world.add(make_shared<sphere>(point3(0,-1000,0), 1000, make_shared<lambertian>(checker)));
 
-    for (int a = -11; a < 11; a++) {
-        for (int b = -11; b < 11; b++) {
+    for (int a = -11; a < 11; a+=4) {
+        for (int b = -11; b < 11; b+=4) {
             auto choose_mat = random_double();
             point3 center(a + 0.9*random_double(), 0.2, b + 0.9*random_double());
 
@@ -105,32 +102,77 @@ hittable_list random_scene() {
     auto material3 = make_shared<metal>(color(0.7, 0.6, 0.5), 0.0);
     world.add(make_shared<sphere>(point3(4, 1, 0), 1.0, material3));
 
+    //auto material4 = make_shared<lambertian>(make_shared<texture_noise>(4));
+    //world.add(make_shared<sphere>(point3(4, 0.8, 2), 0.8, material4));
+
+    //auto material5 = make_shared<lambertian>(make_shared<texture_image>("src/earthmap.jpg"));
+    //world.add(make_shared<sphere>(point3(4, 0.8,-2), 0.8, material5));
+
+    auto material6 = make_shared<material_light>(color(4,4,4));
+    //world.add(make_shared<sphere>(point3(4, 4, 0), 2.0, material6));
+    //world.add(make_shared<hittable_rect>(point3(-2, 1, -2), point3(2, 4, -2), material6)); //Z aligned
+    //world.add(make_shared<hittable_rect>(point3(-2, 1, -2), point3(-2, 4, 2), material6)); // X aligned
+    world.add(make_shared<hittable_rect>(point3(-4, 4, -4), point3( 4, 4, 4), material6)); // Y aligned
+
     return world;
 }
 
 
+hittable_list cornell_box(){
+    hittable_list world;
+    auto red   = make_shared<lambertian>(color(.65, .05, .05));
+    auto white = make_shared<lambertian>(color(.73, .73, .73));
+    auto green = make_shared<lambertian>(color(.12, .45, .15));
+    auto light = make_shared<material_light>(color(15,15,15));
+
+    int s = 2;
+    world.add(make_shared<hittable_rect>(point3(-s,   0, -s), point3( s,   0, s), white));
+    world.add(make_shared<hittable_rect>(point3(-s,   0, -s), point3( s, s*2,-s), white));
+    world.add(make_shared<hittable_rect>(point3(-s,   0, -s), point3(-s, s*2, s), red));
+    world.add(make_shared<hittable_rect>(point3( s,   0, -s), point3( s, s*2, s), green));
+
+    world.add(make_shared<hittable_rect>(point3(-s, s*2, -s), point3( s, s*2, s), white));
+    world.add(make_shared<hittable_rect>(point3(-s*0.5, s*2-0.1, -s*0.5), point3( s*0.5, s*2-0.1, s*0.5), light));
+
+
+
+    auto material3 = make_shared<metal>(color(0.7, 0.6, 0.5), 0.0);
+    world.add(make_shared<sphere>(point3(0, 1.0, 0), 1.0, material3));
+
+
+
+    //auto material6 = make_shared<material_light>(color(4,4,4));
+    //world.add(make_shared<hittable_rect>(point3(-4, 4, -4), point3( 4, 4, 4), material6)); // Y aligned
+
+    return world;
+}
+
 
 int main(int argc, char *argv[]) {
     //Image data
-    const int IMG_WIDTH = 512;
-    const int IMG_HEIGHT = 256;
+    const double RES_MUL = 1;
+    const int IMG_WIDTH = 512 * RES_MUL;
+    const int IMG_HEIGHT = 512 * RES_MUL;
     const int CHANNELS = 3;
     const char* OUTPUT_PATH = "output.png";
     unsigned char pixels[IMG_WIDTH * IMG_HEIGHT * CHANNELS];
-    const int SPP = 32;
+    const int SPP = 64 * RES_MUL;
     const int MAX_DEPTH = 8;
 
 
     //Scene
-    hittable_list world = random_scene();
+    //hittable_list world = random_scene();
+    hittable_list world = cornell_box();
+    color background = color(0.01, 0.01, 0.01);
     cout << "Scene created." << endl;
 
 
     //Camera
-    const vec3 lookfrom = vec3(13, 2, 3);
-    const vec3 lookat   = vec3( 0, 0, 0);
+    //const vec3 lookfrom = vec3(13, 2, 3);
+    const vec3 lookfrom = vec3( 0, 2,  10);
+    const vec3 lookat   = vec3( 0, 2, 0);
     const vec3 vup      = vec3( 0, 1, 0);
-    const double FOV = 20.0;
+    const double FOV = 30.0;
     const double ASPECT_RATIO = IMG_WIDTH / IMG_HEIGHT;
     auto dist_to_focus = 10.0;
     auto aperture = 0.1;
@@ -161,7 +203,7 @@ int main(int argc, char *argv[]) {
                     const double u = (i + random_double()) / (IMG_WIDTH-1);
                     const double v = (j + random_double()) / (IMG_HEIGHT-1);
                     ray r = cam.get_ray(u, v);
-                    pixel_color += ray_color(r, world, MAX_DEPTH);
+                    pixel_color += ray_color(r, background, world, MAX_DEPTH);
                 }
 
                 //Output the color into the right pixel

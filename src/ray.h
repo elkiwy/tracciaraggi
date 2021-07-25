@@ -13,7 +13,7 @@ class ray{
     vec3 direction() const { return dir; }
     point3 at(double t) const {return orig + t * dir;}
 
-  public:
+  private:
     point3 orig;
     vec3 dir;
 };
