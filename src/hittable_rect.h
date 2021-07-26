@@ -14,15 +14,15 @@ class hittable_rect : public hittable{
 
     hittable_rect(const point3& _a, const point3& _b, shared_ptr<material> _m) : a(_a), b(_b), mat_ptr(_m) {
         //Asign the right axis by checking where it's aligned
-        if      (_a.x() == _b.x()){ this->ax = yz;}
-        else if (_a.y() == _b.y()){ this->ax = xz;}
-        else if (_a.z() == _b.z()){ this->ax = xy;}
+        if      (_a.x() == _b.x()){ this->ax = axis_yz;}
+        else if (_a.y() == _b.y()){ this->ax = axis_xz;}
+        else if (_a.z() == _b.z()){ this->ax = axis_xy;}
         else{std::cerr << "WARNING: Rect it's not aligned to any axis " << endl;}
 
         //Select the right axis
-        this->ax_1 = (ax == xy) ? 0 : ((ax == xz) ? 0 : 1);
-        this->ax_2 = (ax == xy) ? 1 : ((ax == xz) ? 2 : 2);
-        this->ax_k = (ax == xy) ? 2 : ((ax == xz) ? 1 : 0);
+        this->ax_1 = (ax == axis_xy) ? 0 : ((ax == axis_xz) ? 0 : 1);
+        this->ax_2 = (ax == axis_xy) ? 1 : ((ax == axis_xz) ? 2 : 2);
+        this->ax_k = (ax == axis_xy) ? 2 : ((ax == axis_xz) ? 1 : 0);
     };
 
     //Hittable methods
@@ -54,7 +54,7 @@ bool hittable_rect::hit(const ray& r, double t_min, double t_max, hit_record& re
     //Write the hit data
     double u = (v1 - a[ax_1])/(b[ax_1]-a[ax_1]);
     double v = (v2 - a[ax_2])/(b[ax_2]-a[ax_2]);
-    vec3 normal = vec3((int)(ax == yz), (int)(ax == xz), (int)(ax == xy));
+    vec3 normal = vec3((int)(ax == axis_yz), (int)(ax == axis_xz), (int)(ax == axis_xy));
     rec.write_data(r, t, r.at(t), normal, this->mat_ptr, u, v);
     return true;
 }

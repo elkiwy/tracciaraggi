@@ -119,27 +119,41 @@ hittable_list random_scene() {
 
 
 hittable_list cornell_box(){
+    //Materials
     hittable_list world;
     auto red   = make_shared<lambertian>(color(.65, .05, .05));
     auto white = make_shared<lambertian>(color(.73, .73, .73));
     auto green = make_shared<lambertian>(color(.12, .45, .15));
     auto light = make_shared<material_light>(color(15,15,15));
 
+    //Box
     int s = 2;
     world.add(make_shared<hittable_rect>(point3(-s,   0, -s), point3( s,   0, s), white));
     world.add(make_shared<hittable_rect>(point3(-s,   0, -s), point3( s, s*2,-s), white));
     world.add(make_shared<hittable_rect>(point3(-s,   0, -s), point3(-s, s*2, s), red));
     world.add(make_shared<hittable_rect>(point3( s,   0, -s), point3( s, s*2, s), green));
-
     world.add(make_shared<hittable_rect>(point3(-s, s*2, -s), point3( s, s*2, s), white));
+
+    //Light
     world.add(make_shared<hittable_rect>(point3(-s*0.5, s*2-0.1, -s*0.5), point3( s*0.5, s*2-0.1, s*0.5), light));
 
 
 
     auto material3 = make_shared<metal>(color(0.7, 0.6, 0.5), 0.0);
-    world.add(make_shared<sphere>(point3(0, 1.0, 0), 1.0, material3));
 
 
+    //world.add(make_shared<hittable_constant_medium>(make_shared<sphere>(point3(-2, 1.0, 0), 1.0, white), 0.99, color(0,0,0)));
+    world.add(make_shared<hittable_constant_medium>(make_shared<sphere>(point3( 0, 1.0, 0), 9.0, white), 0.10, color(0.1,0.1,0.1)));
+    //world.add(make_shared<hittable_constant_medium>(make_shared<sphere>(point3( 2, 1.0, 0), 1.0, white), 2.99, color(0,0,0)));
+
+
+
+    shared_ptr<hittable> rect = make_shared<hittable_rect>(point3(-1, 0, 0), point3(1, 2, 0), material3);
+    //rect = make_shared<hittable_translated>(rect, vec3(0.5, 0, 0));
+    rect = make_shared<hittable_rotated>(rect, axis_z, 30);
+    rect = make_shared<hittable_rotated>(rect, axis_x, 60);
+    rect = make_shared<hittable_rotated>(rect, axis_y, 30);
+    world.add(rect);
 
     //auto material6 = make_shared<material_light>(color(4,4,4));
     //world.add(make_shared<hittable_rect>(point3(-4, 4, -4), point3( 4, 4, 4), material6)); // Y aligned
@@ -156,7 +170,7 @@ int main(int argc, char *argv[]) {
     const int CHANNELS = 3;
     const char* OUTPUT_PATH = "output.png";
     unsigned char pixels[IMG_WIDTH * IMG_HEIGHT * CHANNELS];
-    const int SPP = 64 * RES_MUL;
+    const int SPP = 128 * RES_MUL;
     const int MAX_DEPTH = 8;
 
 

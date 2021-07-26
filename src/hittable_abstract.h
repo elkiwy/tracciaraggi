@@ -23,14 +23,18 @@ struct hit_record{
     double u,v;
     bool front_face;
 
+    inline void set_face_normal(const ray& r, const vec3& n){
+        this->front_face = dot(r.direction(), n) < 0;
+        this->normal = this->front_face ? n : -n;
+    }
+
     inline void write_data(const ray& r, double t, const point3& point, const vec3& outward_normal, shared_ptr<material> material, double u, double v){
         //Set point and time
         this->p = point;
         this->t = t;
 
         //Set face normal and face sign
-        this->front_face = dot(r.direction(), outward_normal) < 0;
-        this->normal = this->front_face ? outward_normal : -outward_normal;
+        this->set_face_normal(r, outward_normal);
 
         //Set material
         this->mat_ptr = material;
@@ -41,6 +45,9 @@ struct hit_record{
     }
 };
 
+inline std::ostream& operator<<(std::ostream &out, const hit_record& r) {
+    return out << "{p:" << r.p << ",t:" <<  r.t << ",normal:" <<  r.normal << ",uv:[" <<  r.u << "," <<  r.v << "]}" ;
+}
 
 
 

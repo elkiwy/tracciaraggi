@@ -8,6 +8,8 @@
 
 //Objects
 #include "hittable_abstract.h"
+#include "hittable_transforms.h"
+#include "hittable_volumes.h"
 #include "hittable_sphere.h"
 #include "hittable_rect.h"
 
@@ -17,6 +19,7 @@
 #include "material_metal.h"
 #include "material_dielectric.h"
 #include "material_light.h"
+#include "material_isotropic.h"
 
 //Textures
 #include "texture_abstract.h"

@@ -23,7 +23,7 @@ struct uv{
     double v;
 };
 
-enum axis{xy, xz, yz};
+enum axis{axis_xy, axis_xz, axis_yz, axis_x, axis_y, axis_z};
 
 
 
