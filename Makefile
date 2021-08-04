@@ -12,7 +12,8 @@ SOURCES := $(wildcard $(SRC)/*.cpp)
 OBJECTS := $(patsubst %.cpp, $(OBJ)/%.o, $(notdir $(SOURCES)))
 
 #Libs
-LIBS = -L /usr/local/lib -fopenmp
+LIBSDL = -l SDL2-2.0.0 -l SDL2_ttf -l SDL2_image -l SDL2_gfx
+LIBS = -L /usr/local/lib -fopenmp $(LIBSDL) -I/usr/local/include
 
 #Flags
 WARNS = -Wall

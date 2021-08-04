@@ -9,10 +9,17 @@
 //Include OpemMP for multithreading
 #include <omp.h>
 
+
+
 //Project files
 #include "utils.h"
 #include "objects.h"
 #include "camera.h"
+
+
+//SDL Display
+#include "SDL2/SDL.h"
+#include "display_controller.h"
 
 //Namespaces
 using namespace std;
@@ -31,6 +38,13 @@ void write_color(unsigned char* pixelsData, const int index, color pixel_color, 
     pixelsData[index+0] = (unsigned char)(256*clamp(r, 0.0, 0.999));
     pixelsData[index+1] = (unsigned char)(256*clamp(g, 0.0, 0.999));
     pixelsData[index+2] = (unsigned char)(256*clamp(b, 0.0, 0.999));
+}
+
+
+void write_color_acc(double* pixelsData, const int index, color pixel_color){
+    pixelsData[index+0] += pixel_color.x();
+    pixelsData[index+1] += pixel_color.y();
+    pixelsData[index+2] += pixel_color.z();
 }
 
 
@@ -162,24 +176,14 @@ hittable_list cornell_box(){
 }
 
 
-int main(int argc, char *argv[]) {
-    //Image data
-    const double RES_MUL = 1;
-    const int IMG_WIDTH = 512 * RES_MUL;
-    const int IMG_HEIGHT = 512 * RES_MUL;
+void renderScene(void* pixels, int IMG_WIDTH, int IMG_HEIGHT, int SPP, int MAX_DEPTH, bool accumulative = false){
     const int CHANNELS = 3;
-    const char* OUTPUT_PATH = "output.png";
-    unsigned char pixels[IMG_WIDTH * IMG_HEIGHT * CHANNELS];
-    const int SPP = 128 * RES_MUL;
-    const int MAX_DEPTH = 8;
-
 
     //Scene
     //hittable_list world = random_scene();
     hittable_list world = cornell_box();
     color background = color(0.01, 0.01, 0.01);
-    cout << "Scene created." << endl;
-
+    if(!accumulative){cout << "Scene created." << endl;}
 
     //Camera
     //const vec3 lookfrom = vec3(13, 2, 3);
@@ -191,8 +195,7 @@ int main(int argc, char *argv[]) {
     auto dist_to_focus = 10.0;
     auto aperture = 0.1;
     camera cam(lookfrom, lookat, vup, FOV, ASPECT_RATIO, aperture, dist_to_focus);
-    cout << "Camera created." << endl;
-
+    if(!accumulative){cout << "Camera created." << endl;}
 
     //Multithreading
     double time = 0.0;
@@ -221,8 +224,10 @@ int main(int argc, char *argv[]) {
                 }
 
                 //Output the color into the right pixel
-                const int PIXEL_INDEX = (i+(j*IMG_WIDTH)) * CHANNELS;
-                write_color(pixels, PIXEL_INDEX, pixel_color, SPP);
+                const int PIXEL_INDEX = (i+(j*IMG_WIDTH)) * 3;//3 channels
+                if(accumulative){write_color_acc((double*)pixels, PIXEL_INDEX, pixel_color);
+                }else{write_color((unsigned char*)pixels, PIXEL_INDEX, pixel_color, SPP);}
+
             }
         }
 
@@ -230,18 +235,132 @@ int main(int argc, char *argv[]) {
         int thread_id = omp_get_thread_num();
         double thread_end = omp_get_wtime();
         chunksDone++;
-        printf("Thread %d (chunk: %d-%d) finished in %f, remains %d chunks.\n", thread_id, k*STEP, (k+1)*STEP, (double)(thread_end - thread_begin), THREADS-chunksDone);
+        if(!accumulative){printf("Thread %d (chunk: %d-%d) finished in %f, remains %d chunks.\n", thread_id, k*STEP, (k+1)*STEP, (double)(thread_end - thread_begin), THREADS-chunksDone);}
     }
-
-    //Flip the final image and save it
-    stbi_flip_vertically_on_write(1);
-    stbi_write_png(OUTPUT_PATH, IMG_WIDTH, IMG_HEIGHT, CHANNELS, pixels, IMG_WIDTH * CHANNELS);
 
     //Output total time elapsed
     double end = omp_get_wtime();
     time = (double)(end - begin);
-    printf("Time elpased for rendering %f\n", time);
+    if(!accumulative){printf("Time elpased for rendering %f\n", time);}
 
+}
+
+
+int main_renderToFile(int argc, char* argv[]){
+    //Image data
+    const double RES_MUL = 1;
+    const int IMG_WIDTH = 512 * RES_MUL;
+    const int IMG_HEIGHT = 512 * RES_MUL;
+    const char* OUTPUT_PATH = "output.png";
+    const int SPP = 128 * RES_MUL;
+    const int MAX_DEPTH = 8;
+    unsigned char pixels[IMG_WIDTH * IMG_HEIGHT * 3];
+
+    //Render scene
+    renderScene(pixels, IMG_WIDTH, IMG_HEIGHT, SPP, MAX_DEPTH);
+
+    //Flip the final image and save it
+    stbi_flip_vertically_on_write(1);
+    stbi_write_png(OUTPUT_PATH, IMG_WIDTH, IMG_HEIGHT, 3, pixels, IMG_WIDTH * 3);
 
     return 0;
+}
+
+
+
+
+
+
+
+
+
+int main_renderToDisplay(int argc, char *argv[]) {
+    //Image data
+    const double RES_MUL = 1;
+    const int IMG_WIDTH = 512 * RES_MUL;
+    const int IMG_HEIGHT = 512 * RES_MUL;
+    const int SPP = 1;
+    const int MAX_DEPTH = 8;
+    //unsigned char pixels[IMG_WIDTH * IMG_HEIGHT * 3];
+    double pixelsAcc[IMG_WIDTH * IMG_HEIGHT * 3];
+    int samples = 0;
+
+    //Init controller (SDL, Window, etc...)
+    DisplayController& controller = DisplayController::getInstance();
+    controller.init(IMG_WIDTH, IMG_HEIGHT);
+    uint32_t* screenPixelData = controller.getPixelDataPtr();
+
+    //renderScene(pixels, IMG_WIDTH, IMG_HEIGHT, SPP, MAX_DEPTH);
+
+    //Display loop
+    bool quit = false;
+    SDL_Event e;
+    while(!quit){
+        while(SDL_PollEvent(&e) != 0){
+            //Quit event
+            if(e.type == SDL_QUIT){
+                quit = true;
+
+            //Keydown event
+            }else if(e.type == SDL_KEYDOWN && e.key.repeat == 0){
+                //controller.keyPressed(KeyCode(e.key.keysym.sym));
+
+            //Mouse event
+            }else if(e.type == SDL_MOUSEBUTTONDOWN){
+                //controller.onMousePress(*(MouseButtonEvent*)&e.button);
+
+            //Mouse Scroll Wheel
+            }else if(e.type == SDL_MOUSEWHEEL){
+                //controller.onScrollWheel(e.wheel.y);
+            }
+        }
+
+        ////Keydown event
+        //const Uint8* currentKeyStates = SDL_GetKeyboardState(NULL);
+        //controller.onKeyDown(currentKeyStates);
+
+        //Update
+        controller.update();
+
+
+        //Draw
+        renderScene(pixelsAcc, IMG_WIDTH, IMG_HEIGHT, SPP, MAX_DEPTH, true);
+        samples += SPP;
+        double gammaScale = 1.0 / samples;
+        for (int j=0;j<IMG_HEIGHT;++j){
+            for (int i=0;i<IMG_WIDTH;++i){
+                int ind = i + (j * IMG_WIDTH);
+
+                //Extract with gamma correction
+                double r = sqrt(gammaScale * pixelsAcc[ind*3+0]);
+                double g = sqrt(gammaScale * pixelsAcc[ind*3+1]);
+                double b = sqrt(gammaScale * pixelsAcc[ind*3+2]);
+
+                screenPixelData[ind] = 0;
+                screenPixelData[ind] |= (unsigned char)(256*clamp(r, 0.0, 0.999));
+                screenPixelData[ind] |= (unsigned char)(256*clamp(g, 0.0, 0.999)) << 8;
+                screenPixelData[ind] |= (unsigned char)(256*clamp(b, 0.0, 0.999)) << 16;
+            }
+        }
+
+
+        controller.draw();
+        controller.drawImGui();
+    }
+
+    //Close event
+    controller.close();
+    return 0;
+}
+
+
+
+
+
+
+
+
+int main(int argc, char *argv[]) {
+    //return main_renderToFile(argc, argv);
+    return main_renderToDisplay(argc, argv);
 }
