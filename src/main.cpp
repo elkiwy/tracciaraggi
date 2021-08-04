@@ -2,6 +2,7 @@
 //Base library
 #include <iostream>
 #include <math.h>
+#include <chrono>
 
 //
 #include "extern_stb_image.h"
@@ -51,15 +52,19 @@ void write_color_acc(double* pixelsData, const int index, color pixel_color){
 
 
 
+struct scene{
+    hittable_list objects;
+    color background;
+};
 
 
-color ray_color(const ray& r, const color& background, const hittable& world, int depth){
+color ray_color(const ray& r, const scene& world, int depth){
     //Limit max recursion
     if (depth<=0){return color(0,0,0);}
 
     //Check for world collision
     hit_record rec;
-    if(!world.hit(r, 0.001, infinity, rec)){return background;}
+    if(!world.objects.hit(r, 0.001, infinity, rec)){return world.background;}
 
     //Check the scattered ray
     ray scattered;
@@ -68,7 +73,7 @@ color ray_color(const ray& r, const color& background, const hittable& world, in
     if (!rec.mat_ptr->scatter(r, rec, attenuation, scattered)){return emitted;}
 
     //Recur
-    return emitted + attenuation * ray_color(scattered, background, world, depth-1);
+    return emitted + attenuation * ray_color(scattered, world, depth-1);
 }
 
 
@@ -116,8 +121,8 @@ hittable_list random_scene() {
     auto material3 = make_shared<metal>(color(0.7, 0.6, 0.5), 0.0);
     world.add(make_shared<sphere>(point3(4, 1, 0), 1.0, material3));
 
-    //auto material4 = make_shared<lambertian>(make_shared<texture_noise>(4));
-    //world.add(make_shared<sphere>(point3(4, 0.8, 2), 0.8, material4));
+    auto marble = make_shared<lambertian>(make_shared<texture_noise>(4));
+    world.add(make_shared<sphere>(point3(4, 0.8, 2), 0.8, marble));
 
     //auto material5 = make_shared<lambertian>(make_shared<texture_image>("src/earthmap.jpg"));
     //world.add(make_shared<sphere>(point3(4, 0.8,-2), 0.8, material5));
@@ -132,70 +137,66 @@ hittable_list random_scene() {
 }
 
 
-hittable_list cornell_box(){
+
+
+void cornell_box(scene* outputScene){
+    outputScene->background = color(0.035, 0.025, 0.05);
+
     //Materials
-    hittable_list world;
     auto red   = make_shared<lambertian>(color(.65, .05, .05));
     auto white = make_shared<lambertian>(color(.73, .73, .73));
     auto green = make_shared<lambertian>(color(.12, .45, .15));
-    auto light = make_shared<material_light>(color(15,15,15));
+
+    //auto red   = make_shared<metal>(color(.65, .05, .05), 0.5);
+    //auto white = make_shared<metal>(color(.73, .73, .73), 0.5);
+    //auto green = make_shared<metal>(color(.12, .45, .15), 0.5);
 
     //Box
     int s = 2;
-    world.add(make_shared<hittable_rect>(point3(-s,   0, -s), point3( s,   0, s), white));
-    world.add(make_shared<hittable_rect>(point3(-s,   0, -s), point3( s, s*2,-s), white));
-    world.add(make_shared<hittable_rect>(point3(-s,   0, -s), point3(-s, s*2, s), red));
-    world.add(make_shared<hittable_rect>(point3( s,   0, -s), point3( s, s*2, s), green));
-    world.add(make_shared<hittable_rect>(point3(-s, s*2, -s), point3( s, s*2, s), white));
+    outputScene->objects.add(make_shared<hittable_rect>(point3(-s,   0, -s), point3( s,   0, s), white));
+    outputScene->objects.add(make_shared<hittable_rect>(point3(-s,   0, -s), point3( s, s*2,-s), white));
+    outputScene->objects.add(make_shared<hittable_rect>(point3(-s,   0, -s), point3(-s, s*2, s), red));
+    outputScene->objects.add(make_shared<hittable_rect>(point3( s,   0, -s), point3( s, s*2, s), green));
+    outputScene->objects.add(make_shared<hittable_rect>(point3(-s, s*2, -s), point3( s, s*2, s), white));
 
     //Light
-    world.add(make_shared<hittable_rect>(point3(-s*0.5, s*2-0.1, -s*0.5), point3( s*0.5, s*2-0.1, s*0.5), light));
+    //outputScene->objects.add(make_shared<hittable_rect>(point3(-s*0.5, s*2-0.1, -s*0.5), point3( s*0.5, s*2-0.1, s*0.5), light));
 
-
-
+    //Things
     auto material3 = make_shared<metal>(color(0.7, 0.6, 0.5), 0.0);
+    outputScene->objects.add(make_shared<hittable_constant_medium>(make_shared<sphere>(point3( 0, 1.0, 0), 9.0, white), 0.10, color(0.1,0.1,0.1)));
 
+    //Metal ball
+    auto met = make_shared<metal>(color(0.7, 0.6, 0.5), 0.01);
+    outputScene->objects.add(make_shared<sphere>(point3(-1, 2, -1), 0.9, met));
 
-    //world.add(make_shared<hittable_constant_medium>(make_shared<sphere>(point3(-2, 1.0, 0), 1.0, white), 0.99, color(0,0,0)));
-    world.add(make_shared<hittable_constant_medium>(make_shared<sphere>(point3( 0, 1.0, 0), 9.0, white), 0.10, color(0.1,0.1,0.1)));
-    //world.add(make_shared<hittable_constant_medium>(make_shared<sphere>(point3( 2, 1.0, 0), 1.0, white), 2.99, color(0,0,0)));
+    //Marble ball
+    //auto marble = make_shared<lambertian>(make_shared<texture_noise>(16));
+    auto marble = make_shared<metal>(make_shared<texture_noise>(8), 0.75);
+    outputScene->objects.add(make_shared<sphere>(point3(1, 1, 0), 0.7, marble));
 
+    //Marble ball
+    auto light1 = make_shared<material_light>(color(5,15,15));
+    auto light2 = make_shared<material_light>(color(15,15,5));
+    outputScene->objects.add(make_shared<sphere>(point3( 1.8, 3.6, -1.8), 0.6, light1));
+    outputScene->objects.add(make_shared<sphere>(point3(-1.8, 3.6, -1.8), 0.6, light2));
 
-
-    shared_ptr<hittable> rect = make_shared<hittable_rect>(point3(-1, 0, 0), point3(1, 2, 0), material3);
-    //rect = make_shared<hittable_translated>(rect, vec3(0.5, 0, 0));
-    rect = make_shared<hittable_rotated>(rect, axis_z, 30);
-    rect = make_shared<hittable_rotated>(rect, axis_x, 60);
-    rect = make_shared<hittable_rotated>(rect, axis_y, 30);
-    world.add(rect);
-
-    //auto material6 = make_shared<material_light>(color(4,4,4));
-    //world.add(make_shared<hittable_rect>(point3(-4, 4, -4), point3( 4, 4, 4), material6)); // Y aligned
-
-    return world;
+    //Rect
+    auto light3 = make_shared<material_light>(color(10,10,10));
+    outputScene->objects.add(make_shared<hittable_rect>(point3(-1.75, 0.01, 1.25), point3( 1.75, 0.01, 1.75), light3));
+    //rect = make_shared<hittable_rotated>(rect, axis_z, 30);
+    //rect = make_shared<hittable_rotated>(rect, axis_x, 60);
+    //rect = make_shared<hittable_rotated>(rect, axis_y, 30);
+    //rect = make_shared<hittable_translated>(rect, vec3(-1, 0, -1));
+    //outputScene->objects.add(rect);
 }
 
 
-void renderScene(void* pixels, int IMG_WIDTH, int IMG_HEIGHT, int SPP, int MAX_DEPTH, bool accumulative = false){
+
+
+
+void renderScene(double* pixels, const scene& world, const camera& cam, int IMG_WIDTH, int IMG_HEIGHT, int SPP, int MAX_DEPTH, bool accumulative = false){
     const int CHANNELS = 3;
-
-    //Scene
-    //hittable_list world = random_scene();
-    hittable_list world = cornell_box();
-    color background = color(0.01, 0.01, 0.01);
-    if(!accumulative){cout << "Scene created." << endl;}
-
-    //Camera
-    //const vec3 lookfrom = vec3(13, 2, 3);
-    const vec3 lookfrom = vec3( 0, 2,  10);
-    const vec3 lookat   = vec3( 0, 2, 0);
-    const vec3 vup      = vec3( 0, 1, 0);
-    const double FOV = 30.0;
-    const double ASPECT_RATIO = IMG_WIDTH / IMG_HEIGHT;
-    auto dist_to_focus = 10.0;
-    auto aperture = 0.1;
-    camera cam(lookfrom, lookat, vup, FOV, ASPECT_RATIO, aperture, dist_to_focus);
-    if(!accumulative){cout << "Camera created." << endl;}
 
     //Multithreading
     double time = 0.0;
@@ -220,13 +221,12 @@ void renderScene(void* pixels, int IMG_WIDTH, int IMG_HEIGHT, int SPP, int MAX_D
                     const double u = (i + random_double()) / (IMG_WIDTH-1);
                     const double v = (j + random_double()) / (IMG_HEIGHT-1);
                     ray r = cam.get_ray(u, v);
-                    pixel_color += ray_color(r, background, world, MAX_DEPTH);
+                    pixel_color += ray_color(r, world, MAX_DEPTH);
                 }
 
                 //Output the color into the right pixel
                 const int PIXEL_INDEX = (i+(j*IMG_WIDTH)) * 3;//3 channels
-                if(accumulative){write_color_acc((double*)pixels, PIXEL_INDEX, pixel_color);
-                }else{write_color((unsigned char*)pixels, PIXEL_INDEX, pixel_color, SPP);}
+                write_color_acc(pixels, PIXEL_INDEX, pixel_color);
 
             }
         }
@@ -235,17 +235,17 @@ void renderScene(void* pixels, int IMG_WIDTH, int IMG_HEIGHT, int SPP, int MAX_D
         int thread_id = omp_get_thread_num();
         double thread_end = omp_get_wtime();
         chunksDone++;
-        if(!accumulative){printf("Thread %d (chunk: %d-%d) finished in %f, remains %d chunks.\n", thread_id, k*STEP, (k+1)*STEP, (double)(thread_end - thread_begin), THREADS-chunksDone);}
+        //if(!accumulative){printf("Thread %d (chunk: %d-%d) finished in %f, remains %d chunks.\n", thread_id, k*STEP, (k+1)*STEP, (double)(thread_end - thread_begin), THREADS-chunksDone);}
     }
 
     //Output total time elapsed
     double end = omp_get_wtime();
     time = (double)(end - begin);
-    if(!accumulative){printf("Time elpased for rendering %f\n", time);}
-
+    printf("Time elpased for rendering %f\n", time);
 }
 
 
+/*
 int main_renderToFile(int argc, char* argv[]){
     //Image data
     const double RES_MUL = 1;
@@ -257,7 +257,22 @@ int main_renderToFile(int argc, char* argv[]){
     unsigned char pixels[IMG_WIDTH * IMG_HEIGHT * 3];
 
     //Render scene
-    renderScene(pixels, IMG_WIDTH, IMG_HEIGHT, SPP, MAX_DEPTH);
+    scene world;
+    cornell_box(&world);
+
+    //Camera
+    const vec3 lookfrom = vec3( 0, 2,  10);
+    const vec3 lookat   = vec3( 0, 2, 0);
+    const vec3 vup      = vec3( 0, 1, 0);
+    const double FOV = 30.0;
+    const double ASPECT_RATIO = IMG_WIDTH / IMG_HEIGHT;
+    auto dist_to_focus = 10.0;
+    auto aperture = 0.1;
+    camera cam(lookfrom, lookat, vup, FOV, ASPECT_RATIO, aperture, dist_to_focus);
+    cout << "Camera created." << endl;
+
+    //Render
+    renderScene(pixels, world, cam, IMG_WIDTH, IMG_HEIGHT, SPP, MAX_DEPTH);
 
     //Flip the final image and save it
     stbi_flip_vertically_on_write(1);
@@ -265,23 +280,38 @@ int main_renderToFile(int argc, char* argv[]){
 
     return 0;
 }
+*/
 
 
 
 
 
+void saveFrame(uint32_t* screenPixelData, int width, int height, long epoch, int suffix){
+    unsigned char pixelData[width * height * 3];
+    for (int j=0;j<height;++j){
+        for (int i=0;i<width;++i){
+            const int ind = (i+j*width);
+            pixelData[ind*3+0] = (unsigned char)(screenPixelData[ind]);
+            pixelData[ind*3+1] = (unsigned char)(screenPixelData[ind] >> 8);
+            pixelData[ind*3+2] = (unsigned char)(screenPixelData[ind] >> 16);
+        }
+    }
 
+    stbi_flip_vertically_on_write(1);
+    string name = "frames/"+ std::to_string(epoch) + "_" + std::to_string(suffix) + ".png";
+    stbi_write_png(name.c_str(), width, height, 3, pixelData, width * 3);
+    cout<<"Frame '"<<name<<"' saved."<<endl;
+}
 
 
 
 int main_renderToDisplay(int argc, char *argv[]) {
     //Image data
-    const double RES_MUL = 1;
+    const double RES_MUL = 2;
     const int IMG_WIDTH = 512 * RES_MUL;
     const int IMG_HEIGHT = 512 * RES_MUL;
-    const int SPP = 1;
+    const int SPP = 2;
     const int MAX_DEPTH = 8;
-    //unsigned char pixels[IMG_WIDTH * IMG_HEIGHT * 3];
     double pixelsAcc[IMG_WIDTH * IMG_HEIGHT * 3];
     int samples = 0;
 
@@ -290,7 +320,25 @@ int main_renderToDisplay(int argc, char *argv[]) {
     controller.init(IMG_WIDTH, IMG_HEIGHT);
     uint32_t* screenPixelData = controller.getPixelDataPtr();
 
-    //renderScene(pixels, IMG_WIDTH, IMG_HEIGHT, SPP, MAX_DEPTH);
+    //Init scene
+    scene world;
+    cornell_box(&world);
+    cout << "Scene created." << endl;
+
+    //Camera
+    const vec3 lookfrom = vec3( 0, 2,  10);
+    const vec3 lookat   = vec3( 0, 2, 0);
+    const vec3 vup      = vec3( 0, 1, 0);
+    const double FOV = 29.0;
+    const double ASPECT_RATIO = IMG_WIDTH / IMG_HEIGHT;
+    auto dist_to_focus = 10.0;
+    auto aperture = 0.1;
+    camera cam(lookfrom, lookat, vup, FOV, ASPECT_RATIO, aperture, dist_to_focus);
+    cout << "Camera created." << endl;
+
+    //Get epoch
+    auto p1 = std::chrono::system_clock::now();
+    auto epoch = std::chrono::duration_cast<std::chrono::seconds>(p1.time_since_epoch()).count();
 
     //Display loop
     bool quit = false;
@@ -298,33 +346,18 @@ int main_renderToDisplay(int argc, char *argv[]) {
     while(!quit){
         while(SDL_PollEvent(&e) != 0){
             //Quit event
-            if(e.type == SDL_QUIT){
-                quit = true;
-
-            //Keydown event
-            }else if(e.type == SDL_KEYDOWN && e.key.repeat == 0){
-                //controller.keyPressed(KeyCode(e.key.keysym.sym));
-
-            //Mouse event
-            }else if(e.type == SDL_MOUSEBUTTONDOWN){
-                //controller.onMousePress(*(MouseButtonEvent*)&e.button);
-
-            //Mouse Scroll Wheel
-            }else if(e.type == SDL_MOUSEWHEEL){
-                //controller.onScrollWheel(e.wheel.y);
-            }
+            if(e.type == SDL_QUIT){quit = true;}
         }
 
-        ////Keydown event
-        //const Uint8* currentKeyStates = SDL_GetKeyboardState(NULL);
-        //controller.onKeyDown(currentKeyStates);
+        //Keydown event
+        const Uint8* currentKeyStates = SDL_GetKeyboardState(NULL);
+        controller.onKeyDown(currentKeyStates);
 
         //Update
         controller.update();
 
-
         //Draw
-        renderScene(pixelsAcc, IMG_WIDTH, IMG_HEIGHT, SPP, MAX_DEPTH, true);
+        renderScene(pixelsAcc, world, cam, IMG_WIDTH, IMG_HEIGHT, SPP, MAX_DEPTH, true);
         samples += SPP;
         double gammaScale = 1.0 / samples;
         for (int j=0;j<IMG_HEIGHT;++j){
@@ -342,7 +375,9 @@ int main_renderToDisplay(int argc, char *argv[]) {
                 screenPixelData[ind] |= (unsigned char)(256*clamp(b, 0.0, 0.999)) << 16;
             }
         }
+        cout << "Samples: " << samples << endl;
 
+        saveFrame(screenPixelData, IMG_WIDTH, IMG_HEIGHT, epoch, samples / SPP);
 
         controller.draw();
         controller.drawImGui();

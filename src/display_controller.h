@@ -39,7 +39,7 @@ class DisplayController{
 
         //Input events
         //void keyPressed(const KeyCode k);
-        //void onKeyDown(const uint8_t* keyStates);
+        void onKeyDown(const uint8_t* keyStates);
         //void onMousePress(const MouseButtonEvent& button);
         //void onScrollWheel(float offset);
         //point2 getMouseScreenPosition();
@@ -109,6 +109,21 @@ void DisplayController::close(){
 uint32_t* DisplayController::getPixelDataPtr(){
     return _pixelData;
 }
+
+
+
+
+
+/*
+** Controls
+*/
+
+void DisplayController::onKeyDown(const uint8_t *keyStates){
+
+}
+
+
+
 
 
 /*

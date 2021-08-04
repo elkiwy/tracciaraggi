@@ -12,9 +12,9 @@ class texture_noise : public texture{
 
     virtual color value(double u, double v, const vec3& p) const override{
         ////Uniform turbolence
-        //return color(1,1,1) * noise.turb(scale * p);
+        return color(1,1,1) * noise.turb(scale * p);
         //Marble like
-        return color(1,1,1) * 0.5 * (1+sin(scale*p.z() + 10*noise.turb(p)));
+        //return color(1,1,1) * 0.5 * (1+sin(scale*p.x() + 10*noise.turb(p)));
     }
 
   private:
